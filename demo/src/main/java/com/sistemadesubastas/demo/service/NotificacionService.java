@@ -3,6 +3,7 @@ package com.sistemadesubastas.demo.service;
 import com.sistemadesubastas.demo.dto.response.NotificacionResponse;
 import com.sistemadesubastas.demo.entity.*;
 import com.sistemadesubastas.demo.enums.TipoNotificacion;
+import com.sistemadesubastas.demo.repository.AlertaInteresRepository;
 import com.sistemadesubastas.demo.repository.NotificacionRepository;
 import com.sistemadesubastas.demo.repository.SeguimientoSubastaRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,9 +13,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -24,6 +29,7 @@ public class NotificacionService {
 
     private final NotificacionRepository notificacionRepository;
     private final SeguimientoSubastaRepository seguimientoRepository;
+    private final AlertaInteresRepository alertaInteresRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     // ─── Notificaciones de puja ───────────────────────────────────────────────
@@ -113,6 +119,31 @@ public class NotificacionService {
     }
 
     public void notificarSubastaPublicada(Subasta subasta) {
+        Map<Long, Usuario> usuariosCoincidentes = new LinkedHashMap<>();
+        for (AlertaInteres alerta : alertaInteresRepository.findAlertasActivasPorCategoria(
+                subasta.getProducto().getCategoria())) {
+            Usuario usuario = alerta.getUsuario();
+            if (!usuario.getId().equals(subasta.getVendedor().getId()) && coincideConSubasta(alerta, subasta)) {
+                usuariosCoincidentes.put(usuario.getId(), usuario);
+            }
+        }
+
+        String titulo = "Nueva subasta que podría interesarte";
+        String mensaje = subasta.getProducto().getNombre() + " coincide con una de tus alertas. "
+                + "Precio inicial: $" + subasta.getPrecioBase();
+        for (Usuario usuario : usuariosCoincidentes.values()) {
+            if (!notificacionRepository.existsByUsuarioIdAndSubastaIdAndTipo(
+                    usuario.getId(), subasta.getId(), TipoNotificacion.ALERTA_INTERES)) {
+                crearYEnviar(usuario, subasta, TipoNotificacion.ALERTA_INTERES, titulo, mensaje);
+                Map<String, Object> alerta = new HashMap<>();
+                alerta.put("tipo", TipoNotificacion.ALERTA_INTERES.name());
+                alerta.put("subastaId", subasta.getId());
+                alerta.put("titulo", titulo);
+                alerta.put("mensaje", mensaje);
+                messagingTemplate.convertAndSendToUser(usuario.getUsername(), "/queue/notificaciones", alerta);
+            }
+        }
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("tipo", "SUBASTA_PUBLICADA");
         payload.put("subastaId", subasta.getId());
@@ -197,5 +228,35 @@ public class NotificacionService {
                 .fechaLectura(n.getFechaLectura())
                 .subastaId(n.getSubasta() != null ? n.getSubasta().getId() : null)
                 .build();
+    }
+
+    private boolean coincideConSubasta(AlertaInteres alerta, Subasta subasta) {
+        Producto producto = subasta.getProducto();
+        String textoProducto = normalizarTexto(String.join(" ",
+            producto.getNombre() == null ? "" : producto.getNombre(),
+            producto.getDescripcion() == null ? "" : producto.getDescripcion(),
+            producto.getModelo() == null ? "" : producto.getModelo(),
+            producto.getMarca() == null ? "" : producto.getMarca()));
+
+        // La categoría es obligatoria; los criterios textuales informados amplían
+        // la coincidencia: alcanza con que marca O palabras clave aparezcan.
+        boolean tieneCriterioTexto = alerta.getMarca() != null || alerta.getPalabrasClave() != null;
+        boolean coincideTexto = !tieneCriterioTexto
+            || (alerta.getMarca() != null && textoProducto.contains(normalizarTexto(alerta.getMarca())))
+            || (alerta.getPalabrasClave() != null && textoProducto.contains(normalizarTexto(alerta.getPalabrasClave())));
+        if (!coincideTexto) {
+            return false;
+        }
+
+        BigDecimal precio = subasta.getPrecioBase();
+        return (alerta.getPrecioMin() == null || precio.compareTo(alerta.getPrecioMin()) >= 0)
+                && (alerta.getPrecioMax() == null || precio.compareTo(alerta.getPrecioMax()) <= 0);
+    }
+
+    private String normalizarTexto(String texto) {
+        return Normalizer.normalize(texto == null ? "" : texto, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT)
+                .trim();
     }
 }

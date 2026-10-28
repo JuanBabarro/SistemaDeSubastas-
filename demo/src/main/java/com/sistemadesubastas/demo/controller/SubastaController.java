@@ -53,10 +53,11 @@ public class SubastaController {
     public ResponseEntity<Page<SubastaResponse>> listar(
             @RequestParam(required = false) EstadoSubasta estado,
             @RequestParam(required = false) String categoria,
+            @RequestParam(required = false) String q,
             @RequestParam(required = false) BigDecimal precioMin,
             @RequestParam(required = false) BigDecimal precioMax,
             @PageableDefault(size = 20, sort = "fechaFin") Pageable pageable) {
-        return ResponseEntity.ok(subastaService.listarConFiltros(estado, categoria, precioMin, precioMax, pageable));
+        return ResponseEntity.ok(subastaService.listarConFiltros(estado, categoria, q, precioMin, precioMax, pageable));
     }
 
     /** GET /api/subastas/{id} */
@@ -97,6 +98,26 @@ public class SubastaController {
         boolean esAdmin = userDetails.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         subastaService.cancelarSubasta(id, request != null ? request : new CancelarSubastaRequest(), solicitanteId, esAdmin);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** DELETE /api/subastas/{id}/borrador — descarta una creación incompleta. */
+    @DeleteMapping("/{id}/borrador")
+    @PreAuthorize("hasAnyRole('VENDEDOR','ADMIN')")
+    public ResponseEntity<Void> descartarBorrador(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        subastaService.descartarBorrador(id, resolverIdUsuario(userDetails));
+        return ResponseEntity.noContent().build();
+    }
+
+    /** DELETE /api/subastas/{id}/historial — oculta una subasta cancelada o finalizada al vendedor. */
+    @DeleteMapping("/{id}/historial")
+    @PreAuthorize("hasAnyRole('VENDEDOR','ADMIN')")
+    public ResponseEntity<Void> eliminarDelHistorial(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        subastaService.eliminarDelHistorial(id, resolverIdUsuario(userDetails));
         return ResponseEntity.noContent().build();
     }
 

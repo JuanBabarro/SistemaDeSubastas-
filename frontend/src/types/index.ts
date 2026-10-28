@@ -18,7 +18,8 @@ export type TipoNotificacion =
   | 'SUBASTA_POR_FINALIZAR'
   | 'SUBASTA_CERRADA'
   | 'SUBASTA_CANCELADA'
-  | 'GANADOR_ANUNCIADO';
+  | 'GANADOR_ANUNCIADO'
+  | 'ALERTA_INTERES';
 
 export type EstadoPuja = 'ACEPTADA' | 'RECHAZADA';
 
@@ -106,6 +107,26 @@ export interface NotificacionResponse {
   leida: boolean;
   fechaLectura?: string;
   subastaId?: number;
+}
+
+export interface AlertaInteres {
+  id: number;
+  categoria?: string;
+  marca?: string;
+  palabrasClave?: string;
+  precioMin?: number;
+  precioMax?: number;
+  activa: boolean;
+  fechaCreacion: string;
+}
+
+export interface AlertaInteresRequest {
+  categoria: string;
+  marca?: string;
+  palabrasClave?: string;
+  precioMin?: number;
+  precioMax?: number;
+  activa?: boolean;
 }
 
 export interface EstadisticasAdminResponse {

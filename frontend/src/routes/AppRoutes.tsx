@@ -11,6 +11,7 @@ import MiPerfilPage from '../pages/MiPerfilPage';
 import MisPujasPage from '../pages/MisPujasPage';
 import SeguimientosPage from '../pages/SeguimientosPage';
 import NotificacionesPage from '../pages/NotificacionesPage';
+import AlertasInteresPage from '../pages/AlertasInteresPage';
 import AdminDashboardPage from '../pages/AdminDashboardPage';
 
 function ProtectedRoute({ children, roles }: { children: JSX.Element; roles?: string[] }) {
@@ -78,6 +79,11 @@ export default function AppRoutes() {
       <Route path="/notificaciones" element={
         <ProtectedRoute>
           <Layout><NotificacionesPage /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/alertas-interes" element={
+        <ProtectedRoute>
+          <Layout><AlertasInteresPage /></Layout>
         </ProtectedRoute>
       } />
       <Route path="/admin" element={

@@ -12,6 +12,7 @@ import com.sistemadesubastas.demo.entity.Subasta;
 import com.sistemadesubastas.demo.entity.Usuario;
 import com.sistemadesubastas.demo.enums.EstadoProducto;
 import com.sistemadesubastas.demo.enums.EstadoSubasta;
+import com.sistemadesubastas.demo.enums.CategoriaProducto;
 import com.sistemadesubastas.demo.exception.*;
 import com.sistemadesubastas.demo.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class SubastaService {
     private final UsuarioRepository usuarioRepository;
     private final PujaRepository pujaRepository;
     private final FotoProductoRepository fotoProductoRepository;
+    private final FotoProductoService fotoProductoService;
     private final NotificacionService notificacionService;
 
     // ─── Creación ────────────────────────────────────────────────────────────
@@ -49,7 +51,7 @@ public class SubastaService {
         Producto producto = Producto.builder()
                 .nombre(request.getNombreProducto())
                 .descripcion(request.getDescripcionProducto())
-                .categoria(request.getCategoriaProducto())
+                .categoria(CategoriaProducto.normalizar(request.getCategoriaProducto()))
                 .marca(request.getMarcaProducto())
                 .modelo(request.getModeloProducto())
                 .vendedor(vendedor)
@@ -78,6 +80,9 @@ public class SubastaService {
         if (subasta.getEstado() != EstadoSubasta.BORRADOR) {
             throw new IllegalArgumentException("Solo se puede publicar una subasta en estado BORRADOR");
         }
+        if (fotoProductoRepository.findByProductoIdOrderByOrdenAsc(subasta.getProducto().getId()).isEmpty()) {
+            throw new IllegalArgumentException("La publicación requiere al menos una foto del producto");
+        }
 
         // Si la fecha de inicio ya llegó, activa directamente; si no, queda PROGRAMADA
         if (!LocalDateTime.now().isBefore(subasta.getFechaInicio())) {
@@ -105,16 +110,44 @@ public class SubastaService {
 
     @Transactional(readOnly = true)
     public Page<SubastaResponse> listarConFiltros(
-            EstadoSubasta estado, String categoria,
+            EstadoSubasta estado, String categoria, String busqueda,
             BigDecimal precioMin, BigDecimal precioMax, Pageable pageable) {
-        return subastaRepository.buscarConFiltros(estado, categoria, precioMin, precioMax, pageable)
+        String termino = busqueda == null ? "" : busqueda.trim();
+        String categoriaFiltro = categoria == null ? "" : categoria.trim();
+        return subastaRepository.buscarConFiltros(estado, categoriaFiltro, termino, precioMin, precioMax, pageable)
                 .map(this::mapearSubastaResponse);
     }
 
     @Transactional(readOnly = true)
     public List<SubastaResponse> obtenerSubastasDelVendedor(Long vendedorId) {
         return subastaRepository.findByVendedorId(vendedorId).stream()
+                .filter(s -> s.getEstado() != EstadoSubasta.BORRADOR)
+                .filter(s -> !Boolean.TRUE.equals(s.getOcultaVendedor()))
                 .map(this::mapearSubastaResponse).toList();
+    }
+
+    public void descartarBorrador(Long subastaId, Long vendedorId) {
+        Subasta subasta = obtenerSubastaPropiaOFallar(subastaId, vendedorId);
+        if (subasta.getEstado() != EstadoSubasta.BORRADOR) {
+            throw new IllegalArgumentException("Solo se puede descartar un borrador incompleto");
+        }
+        Long productoId = subasta.getProducto().getId();
+        Producto producto = subasta.getProducto();
+        fotoProductoService.eliminarArchivosProducto(productoId);
+        subastaRepository.delete(subasta);
+        subastaRepository.flush();
+        productoRepository.delete(producto);
+    }
+
+    public void eliminarDelHistorial(Long subastaId, Long vendedorId) {
+        Subasta subasta = obtenerSubastaPropiaOFallar(subastaId, vendedorId);
+        if (subasta.getEstado() == EstadoSubasta.BORRADOR
+                || subasta.getEstado() == EstadoSubasta.ACTIVA
+                || subasta.getEstado() == EstadoSubasta.PROGRAMADA) {
+            throw new IllegalArgumentException("Primero debes cancelar la subasta antes de quitarla del historial");
+        }
+        subasta.setOcultaVendedor(true);
+        subastaRepository.save(subasta);
     }
 
     @Transactional(readOnly = true)
@@ -151,7 +184,7 @@ public class SubastaService {
         Producto p = subasta.getProducto();
         if (request.getNombreProducto() != null)      p.setNombre(request.getNombreProducto());
         if (request.getDescripcionProducto() != null) p.setDescripcion(request.getDescripcionProducto());
-        if (request.getCategoriaProducto() != null)   p.setCategoria(request.getCategoriaProducto());
+        if (request.getCategoriaProducto() != null)   p.setCategoria(CategoriaProducto.normalizar(request.getCategoriaProducto()));
         if (request.getMarcaProducto() != null)       p.setMarca(request.getMarcaProducto());
         if (request.getModeloProducto() != null)      p.setModelo(request.getModeloProducto());
 
@@ -170,14 +203,6 @@ public class SubastaService {
 
         if (subasta.getEstado() == EstadoSubasta.FINALIZADA || subasta.getEstado() == EstadoSubasta.CANCELADA) {
             throw new CancelacionNoPermitidaException("La subasta ya está " + subasta.getEstado());
-        }
-
-        // Vendedor solo puede cancelar si no tiene pujas (regla del documento)
-        if (!esAdmin) {
-            long cantidadPujas = pujaRepository.countBySubastaId(subastaId);
-            if (cantidadPujas > 0) {
-                throw new CancelacionNoPermitidaException("No se puede cancelar una subasta que ya tiene pujas");
-            }
         }
 
         subasta.setEstado(EstadoSubasta.CANCELADA);

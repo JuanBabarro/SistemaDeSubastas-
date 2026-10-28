@@ -12,6 +12,7 @@ const TIPO_ICONS: Record<string, string> = {
   SUBASTA_CERRADA: '🔒',
   SUBASTA_CANCELADA: '❌',
   GANADOR_ANUNCIADO: '🏆',
+  ALERTA_INTERES: '🔎',
 };
 
 export default function NotificacionesPage() {

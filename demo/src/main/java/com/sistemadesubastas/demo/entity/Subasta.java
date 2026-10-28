@@ -79,6 +79,11 @@ public class Subasta {
     @Column(columnDefinition = "TEXT")
     private String motivoCancelacion;
 
+    /** Oculta la subasta del historial del vendedor sin borrar el registro histórico. */
+    @Column(name = "oculta_vendedor")
+    @Builder.Default
+    private Boolean ocultaVendedor = false;
+
     /**
      * Versión para control de concurrencia optimista.
      * Hibernate lanzará OptimisticLockException si dos transacciones

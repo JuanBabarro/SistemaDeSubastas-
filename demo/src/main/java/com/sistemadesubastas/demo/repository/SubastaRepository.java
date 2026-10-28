@@ -32,14 +32,18 @@ public interface SubastaRepository extends JpaRepository<Subasta, Long> {
     // ---- Filtros compuestos ----
 
     @Query("SELECT s FROM Subasta s JOIN s.producto p " +
-           "WHERE s.estado <> 'BORRADOR' " +
+           "WHERE s.estado <> 'BORRADOR' AND s.estado <> 'CANCELADA' " +
            "AND (:estado IS NULL OR s.estado = :estado) " +
-           "AND (:categoria IS NULL OR p.categoria = :categoria) " +
+           "AND (:categoria = '' OR LOWER(p.categoria) = LOWER(:categoria)) " +
+           "AND (:busqueda = '' OR LOWER(p.nombre) LIKE CONCAT('%', LOWER(:busqueda), '%') " +
+           "OR LOWER(COALESCE(p.modelo, '')) LIKE CONCAT('%', LOWER(:busqueda), '%') " +
+           "OR LOWER(p.categoria) LIKE CONCAT('%', LOWER(:busqueda), '%')) " +
            "AND (:precioMin IS NULL OR s.precioActual >= :precioMin) " +
            "AND (:precioMax IS NULL OR s.precioActual <= :precioMax)")
     Page<Subasta> buscarConFiltros(
             @Param("estado") EstadoSubasta estado,
             @Param("categoria") String categoria,
+            @Param("busqueda") String busqueda,
             @Param("precioMin") BigDecimal precioMin,
             @Param("precioMax") BigDecimal precioMax,
             Pageable pageable

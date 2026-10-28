@@ -14,6 +14,7 @@ export const subastasApi = {
   listar: (params?: {
     estado?: EstadoSubasta;
     categoria?: string;
+    q?: string;
     precioMin?: number;
     precioMax?: number;
     page?: number;
@@ -23,6 +24,7 @@ export const subastasApi = {
     const q = new URLSearchParams();
     if (params?.estado)    q.set('estado', params.estado);
     if (params?.categoria) q.set('categoria', params.categoria);
+    if (params?.q?.trim()) q.set('q', params.q.trim());
     if (params?.precioMin != null) q.set('precioMin', String(params.precioMin));
     if (params?.precioMax != null) q.set('precioMax', String(params.precioMax));
     if (params?.page != null) q.set('page', String(params.page));
@@ -48,6 +50,10 @@ export const subastasApi = {
 
   cancelar: (id: number, data?: CancelarSubastaRequest) =>
     api.post<void>(`/subastas/${id}/cancelacion`, data ?? {}),
+
+  descartarBorrador: (id: number) => api.delete<void>(`/subastas/${id}/borrador`),
+
+  eliminarDelHistorial: (id: number) => api.delete<void>(`/subastas/${id}/historial`),
 
   resultado: (id: number) =>
     api.get<ResultadoSubastaResponse>(`/subastas/${id}/resultado`),

@@ -98,6 +98,20 @@ public class FotoProductoService {
         fotoRepository.saveAll(restantes);
     }
 
+    public void eliminarArchivosProducto(Long productoId) {
+        Path directorio = Paths.get(uploadDir).toAbsolutePath().normalize();
+        for (FotoProducto foto : fotoRepository.findByProductoIdOrderByOrdenAsc(productoId)) {
+            Path archivo = directorio.resolve(Paths.get(foto.getUrl()).getFileName()).normalize();
+            if (archivo.startsWith(directorio)) {
+                try {
+                    Files.deleteIfExists(archivo);
+                } catch (IOException e) {
+                    throw new ErrorAlmacenarImagenException("No se pudo eliminar una foto del borrador", e);
+                }
+            }
+        }
+    }
+
     public void actualizarOrden(Long productoId, ActualizarOrdenFotosRequest request, Long usuarioId) {
         obtenerProductoConPermiso(productoId, usuarioId);
         List<FotoProducto> fotos = fotoRepository.findByProductoIdOrderByOrdenAsc(productoId);

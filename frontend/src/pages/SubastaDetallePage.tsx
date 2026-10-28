@@ -8,6 +8,8 @@ import { pujasApi } from '../api/pujas';
 import { seguimientosApi } from '../api/seguimientos';
 import type { SubastaResponse, PujaResponse, ResultadoPujaResponse } from '../types';
 import { formatCurrency, formatDate, generateUUID } from '../utils/format';
+import { CATEGORIAS } from '../utils/constants';
+import { mediaUrl } from '../utils/media';
 import EstadoBadge from '../components/EstadoBadge';
 import Countdown from '../components/Countdown';
 import { Clock, Tag, User, AlertCircle, CheckCircle, XCircle, Heart, HeartOff, ArrowLeft, ArrowRight, Pencil, Save, Trash2, Upload, X } from 'lucide-react';
@@ -229,14 +231,9 @@ export default function SubastaDetallePage() {
       }}>
         {/* Image */}
         <div>
-          <div
-            role="img"
-            aria-label={foto?.nombreArchivo ?? subasta.nombreProducto}
-            style={{
-              minHeight: 400,
-              background: foto ? `url(${foto.url}) center/cover no-repeat` : 'var(--color-bg)',
-            }}
-          />
+          <div style={{ minHeight: 400, background: 'var(--color-bg)' }}>
+            {foto && <img src={mediaUrl(foto.url)} alt={foto.nombreArchivo ?? subasta.nombreProducto} style={{ display: 'block', width: '100%', minHeight: 400, maxHeight: 560, objectFit: 'contain' }} />}
+          </div>
           {(subasta.fotos?.length ?? 0) > 1 && (
             <div style={{ display: 'flex', gap: 'var(--space-2)', padding: 'var(--space-3)', overflowX: 'auto' }}>
               {subasta.fotos.map((imagen, index) => (
@@ -248,7 +245,7 @@ export default function SubastaDetallePage() {
                   onClick={() => setFotoSeleccionada(imagen.id)}
                   style={{
                     flex: '0 0 64px', width: 64, height: 64,
-                    background: `url(${imagen.url}) center/cover no-repeat`,
+                    background: `url(${mediaUrl(imagen.url)}) center/cover no-repeat`,
                     border: foto?.id === imagen.id ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-sm)', cursor: 'pointer',
                   }}
@@ -446,7 +443,9 @@ export default function SubastaDetallePage() {
               {edicionError && <p role="alert" style={{ color: 'var(--color-error)' }}>{edicionError}</p>}
               <input aria-label="Nombre del producto" required maxLength={200} value={datosEdicion.nombreProducto} onChange={e => setDatosEdicion(prev => ({ ...prev, nombreProducto: e.target.value }))} />
               <textarea aria-label="Descripción" required maxLength={5000} rows={4} value={datosEdicion.descripcionProducto} onChange={e => setDatosEdicion(prev => ({ ...prev, descripcionProducto: e.target.value }))} />
-              <input aria-label="Categoría" required maxLength={100} value={datosEdicion.categoriaProducto} onChange={e => setDatosEdicion(prev => ({ ...prev, categoriaProducto: e.target.value }))} />
+              <select aria-label="Categoría" required value={datosEdicion.categoriaProducto} onChange={e => setDatosEdicion(prev => ({ ...prev, categoriaProducto: e.target.value }))}>
+                {CATEGORIAS.map(categoria => <option key={categoria} value={categoria}>{categoria}</option>)}
+              </select>
               <input aria-label="Marca" maxLength={100} placeholder="Marca" value={datosEdicion.marcaProducto} onChange={e => setDatosEdicion(prev => ({ ...prev, marcaProducto: e.target.value }))} />
               <input aria-label="Modelo" maxLength={100} placeholder="Modelo" value={datosEdicion.modeloProducto} onChange={e => setDatosEdicion(prev => ({ ...prev, modeloProducto: e.target.value }))} />
               <div style={{ display: 'flex', gap: 'var(--space-3)' }}>

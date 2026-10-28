@@ -4,12 +4,15 @@ import { Bell, User, Gavel, PlusCircle, LayoutDashboard, LogOut, Menu, X } from 
 import { useState } from 'react';
 import { notificacionesApi } from '../api/notificaciones';
 import { useEffect } from 'react';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
 export default function Navbar() {
   const { user, logout, hasRole } = useAuth();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [alertaReciente, setAlertaReciente] = useState<{ titulo: string; mensaje: string; subastaId?: number } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -22,6 +25,32 @@ export default function Navbar() {
       }
     };
     load();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setAlertaReciente(null);
+      return;
+    }
+    const client = new Client({
+      webSocketFactory: () => new SockJS('/ws'),
+      reconnectDelay: 5000,
+      onConnect: () => {
+        client.subscribe('/user/queue/notificaciones', message => {
+          const evento = JSON.parse(message.body) as { tipo?: string; titulo?: string; mensaje?: string; subastaId?: number };
+          void notificacionesApi.noLeidas().then(lista => setUnreadCount(lista.length)).catch(() => undefined);
+          if (evento.tipo === 'ALERTA_INTERES') {
+            setAlertaReciente({
+              titulo: evento.titulo ?? 'Nueva subasta de tu interés',
+              mensaje: evento.mensaje ?? 'Se publicó una subasta que coincide con tus alertas.',
+              subastaId: evento.subastaId,
+            });
+          }
+        });
+      },
+    });
+    client.activate();
+    return () => { void client.deactivate(); };
   }, [user]);
 
   const handleLogout = async () => {
@@ -73,6 +102,9 @@ export default function Navbar() {
               <Link to="/seguimientos" style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
                 Seguimientos
               </Link>
+              <Link to="/alertas-interes" style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+                Alertas
+              </Link>
               {hasRole('ADMIN') && (
                 <Link to="/admin" style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
                   <LayoutDashboard size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
@@ -85,6 +117,14 @@ export default function Navbar() {
 
         {/* Right side */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          {alertaReciente && (
+            <div role="status" style={{ position: 'fixed', top: 76, right: 20, zIndex: 100, width: 'min(380px, calc(100vw - 40px))', padding: 'var(--space-4)', background: 'var(--color-surface)', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)' }}>
+              <button type="button" aria-label="Cerrar notificación" onClick={() => setAlertaReciente(null)} style={{ float: 'right', padding: 4, color: 'var(--color-text-muted)' }}><X size={16} /></button>
+              <strong style={{ display: 'block', marginRight: 20, color: 'var(--color-text-primary)' }}>{alertaReciente.titulo}</strong>
+              <p style={{ margin: 'var(--space-2) 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{alertaReciente.mensaje}</p>
+              {alertaReciente.subastaId && <button type="button" onClick={() => { navigate(`/subasta/${alertaReciente.subastaId}`); setAlertaReciente(null); }} style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: '0.85rem' }}>Ver subasta</button>}
+            </div>
+          )}
           {user ? (
             <>
               <Link to="/notificaciones" style={{ position: 'relative', color: 'var(--color-text-secondary)' }}>
@@ -200,6 +240,7 @@ export default function Navbar() {
               )}
               <Link to="/mis-pujas" onClick={() => setMobileOpen(false)}>Mis pujas</Link>
               <Link to="/seguimientos" onClick={() => setMobileOpen(false)}>Seguimientos</Link>
+              <Link to="/alertas-interes" onClick={() => setMobileOpen(false)}>Alertas de interés</Link>
               <Link to="/mi-perfil" onClick={() => setMobileOpen(false)}>Mi perfil</Link>
               {hasRole('ADMIN') && (
                 <Link to="/admin" onClick={() => setMobileOpen(false)}>Admin</Link>

@@ -10,7 +10,6 @@ const ESTADOS: { value: EstadoSubasta | ''; label: string }[] = [
   { value: 'ACTIVA', label: 'Activas' },
   { value: 'PROGRAMADA', label: 'Programadas' },
   { value: 'FINALIZADA', label: 'Finalizadas' },
-  { value: 'CANCELADA', label: 'Canceladas' },
 ];
 
 export default function HomePage() {
@@ -33,6 +32,7 @@ export default function HomePage() {
       const res = await subastasApi.listar({
         estado: estado || undefined,
         categoria: categoria || undefined,
+        q: busqueda.trim() || undefined,
         precioMin: precioMin ? Number(precioMin) : undefined,
         precioMax: precioMax ? Number(precioMax) : undefined,
         page: pageNum,
@@ -47,10 +47,13 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => { load(); }, [estado, categoria]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(0); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [estado, categoria, busqueda, precioMin, precioMax]);
 
   const handleSearch = () => load(0);
-  const hasFilters = estado || categoria || precioMin || precioMax;
+  const hasFilters = estado || categoria || busqueda || precioMin || precioMax;
 
   return (
     <div>
@@ -73,7 +76,7 @@ export default function HomePage() {
           <Search size={18} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
           <input
             type="text"
-            placeholder="Buscar subastas..."
+            placeholder="Buscar por título, modelo o categoría..."
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -156,7 +159,7 @@ export default function HomePage() {
           </div>
           {hasFilters && (
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button onClick={() => { setEstado(''); setCategoria(''); setPrecioMin(''); setPrecioMax(''); }}
+              <button onClick={() => { setEstado(''); setCategoria(''); setBusqueda(''); setPrecioMin(''); setPrecioMax(''); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
                   padding: 'var(--space-2) var(--space-3)',
@@ -193,12 +196,12 @@ export default function HomePage() {
           {page.content.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 'var(--space-16)', color: 'var(--color-text-muted)' }}>
               <p style={{ fontSize: '1.1rem', marginBottom: 'var(--space-2)' }}>No se encontraron subastas</p>
-              <p style={{ fontSize: '0.9rem' }}>Probá cambiando los filtros de búsqueda</p>
+              <p style={{ fontSize: '0.9rem' }}>Probá con otro título, modelo o categoría, o cambiá los filtros.</p>
             </div>
           ) : (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
               gap: 'var(--space-6)',
             }}>
               {page.content.map(s => <SubastaCard key={s.id} subasta={s} />)}

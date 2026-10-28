@@ -15,7 +15,7 @@ import java.util.List;
 /**
  * Scheduler que gestiona el ciclo de vida automático de las subastas:
  *
- *  1. Activar subastas PROGRAMADAS cuya fechaInicio ya llegó (cada 30 s).
+ *  1. Activar subastas PROGRAMADAS cuya fechaInicio ya llegó (cada 5 s).
  *  2. Cerrar subastas ACTIVAS cuya fechaFin ya pasó (cada 15 s).
  *  3. Advertir subastas próximas a vencer (cada minuto).
  */
@@ -30,9 +30,9 @@ public class SubastaScheduler {
 
     /**
      * Activa subastas PROGRAMADAS cuya fechaInicio llegó.
-     * Corre cada 30 segundos.
+    * Corre cada 5 segundos para activar los inicios programados con poco retraso.
      */
-    @Scheduled(fixedDelay = 30_000)
+    @Scheduled(fixedDelay = 5_000)
     public void activarSubastasProgramadas() {
         try {
             subastaService.activarSubastasProgramadas();
